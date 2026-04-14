@@ -16,8 +16,17 @@ interface ForecastingPlotProps {
   color?: string;
 }
 
+type ForecastPoint = {
+  index: number;
+  value: number;
+  upper: number;
+  lower: number;
+  band: [number, number];
+  isForecast: boolean;
+};
+
 export default function ForecastingPlot({ historicalData, title, unit, color = '#22d3ee' }: ForecastingPlotProps) {
-  const [forecastData, setForecastData] = useState<any[]>([]);
+  const [forecastData, setForecastData] = useState<ForecastPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,12 +50,19 @@ export default function ForecastingPlot({ historicalData, title, unit, color = '
         // Merge historical and forecast
         const lastIdx = historicalData[historicalData.length - 1].index;
         const combined = [
-          ...historicalData.map(d => ({ ...d, isForecast: false, upper: d.value, lower: d.value })),
+          ...historicalData.map(d => ({
+            ...d,
+            isForecast: false,
+            upper: d.value,
+            lower: d.value,
+            band: [d.value, d.value] as [number, number],
+          })),
           ...data.forecast.map((v: number, i: number) => ({
             index: lastIdx + i + 1,
             value: v,
             upper: data.upper_bound[i],
             lower: data.lower_bound[i],
+            band: [data.lower_bound[i], data.upper_bound[i]] as [number, number],
             isForecast: true
           }))
         ];
@@ -145,11 +161,10 @@ export default function ForecastingPlot({ historicalData, title, unit, color = '
               {/* Prediction Interval */}
               <Area
                 type="monotone"
-                dataKey="upper"
+                dataKey="band"
                 stroke="none"
                 fill={color}
                 fillOpacity={0.05}
-                baseValue={(data: any) => data.lower}
                 connectNulls
               />
 
