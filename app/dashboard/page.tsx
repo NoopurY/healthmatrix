@@ -19,7 +19,6 @@ import ECGWaveform from '@/components/charts/ECGWaveform';
 import RiskDistributionPie from '@/components/charts/RiskDistributionPie';
 import StatInsightEngine from '@/components/dashboard/StatInsightEngine';
 import AnalysisWalkthrough from '@/components/dashboard/AnalysisWalkthrough';
-import AIInsightCard from '@/components/dashboard/AIInsightCard';
 import CorrelationEngine from '@/components/dashboard/CorrelationEngine';
 import GlassCard from '@/components/ui/GlassCard';
 import NeonBadge from '@/components/ui/NeonBadge';
@@ -293,13 +292,7 @@ export default function DashboardPage() {
                   {/* Warning / Alerts Block */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <RiskGauge score={Math.round(riskScore)} level={riskLevel} />
-                    <AIInsightCard 
-                      metrics={data.stats} 
-                      riskScore={Math.round(riskScore)} 
-                      profile={{ type: isCSV ? 'Batch' : 'Individual', records: data.totalRecords }}
-                      delay={0.5}
-                    />
-                    <div className="lg:col-span-2">
+                    <div className="lg:col-span-3">
                       <RiskAlert 
                         riskLevel={riskLevel} 
                         riskScore={Math.round(riskScore)} 
@@ -378,11 +371,6 @@ export default function DashboardPage() {
                       {ml?.feature_importance && <FeatureImportance data={ml.feature_importance} />}
                       <div className="space-y-8">
                         <RiskGauge score={Math.round(riskScore)} level={riskLevel} />
-                        <AIInsightCard 
-                          metrics={data.stats} 
-                          riskScore={Math.round(riskScore)} 
-                          profile={{ type: isCSV ? 'Batch' : 'Individual', records: data.totalRecords }}
-                        />
                       </div>
                    </div>
                    <RiskAlert 
