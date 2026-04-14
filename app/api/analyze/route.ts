@@ -90,6 +90,9 @@ export async function POST(req: NextRequest) {
         correlationKeys: analysis.correlationKeys,
         correlationMatrix: analysis.correlationMatrix,
         heartRateNormalCurve: analysis.heartRateNormalCurve,
+        bpNormalCurve: analysis.bpNormalCurve,
+        poissonDistribution: analysis.poissonDistribution,
+        poissonLambda: analysis.poissonLambda,
         regressionResults: {
           age_vs_heart_rate: {
             slope: analysis.regressionResults.age_vs_heart_rate.slope,
@@ -98,13 +101,17 @@ export async function POST(req: NextRequest) {
             predictions: analysis.regressionResults.age_vs_heart_rate.predictions.slice(0, 50),
           },
         },
+        regressionExtended: analysis.regressionExtended,
+        spearmanResults: analysis.spearmanResults,
         bayesPrediction: analysis.bayesPrediction,
+        insightMessages: analysis.insightMessages,
         timeSeries: analysis.timeSeries,
         riskDistribution: analysis.riskDistribution,
         mlAggregate: batchResult.aggregate,
         mlSamplePrediction: batchResult.predictions[0],
         errors: analysis.errors,
       });
+
     } else if (type === 'ecg') {
       // ── ECG Analysis ─────────────────────────────────────
       const metadata = { filename: originalName, size, type, uploadedAt: new Date().toISOString() };

@@ -16,6 +16,8 @@ import RiskGauge from '@/components/charts/RiskGauge';
 import FeatureImportance from '@/components/charts/FeatureImportance';
 import ECGWaveform from '@/components/charts/ECGWaveform';
 import RiskDistributionPie from '@/components/charts/RiskDistributionPie';
+import StatInsightEngine from '@/components/dashboard/StatInsightEngine';
+import AnalysisWalkthrough from '@/components/dashboard/AnalysisWalkthrough';
 import GlassCard from '@/components/ui/GlassCard';
 import NeonBadge from '@/components/ui/NeonBadge';
 import Link from 'next/link';
@@ -67,7 +69,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'statistics' | 'ml' | 'ecg'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'statistics' | 'ml' | 'ecg' | 'insights' | 'walkthrough'>('overview');
 
   useEffect(() => {
     const stored = sessionStorage.getItem('healthData');
@@ -201,6 +203,8 @@ export default function DashboardPage() {
                { id: 'overview', label: 'Overview', icon: LayoutDashboard },
                { id: 'statistics', label: 'Clinical Stats', icon: Database },
                { id: 'ml', label: 'AI Risk', icon: Brain },
+               ...(isCSV ? [{ id: 'walkthrough', label: 'How it Works', icon: Stethoscope }] : []),
+               ...(isCSV ? [{ id: 'insights', label: 'Insight Engine', icon: Cpu }] : []),
                ...(isECG ? [{ id: 'ecg', label: 'ECG Visuals', icon: Activity }] : [])
              ].map((tab) => (
                <button
@@ -433,6 +437,32 @@ export default function DashboardPage() {
                   </div>
                  </motion.div>
                )}
+              {/* ── Statistical Insight Engine Tab ────── */}
+              {activeTab === 'insights' && (
+                <motion.div
+                  key="insights"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <StatInsightEngine data={data} />
+                </motion.div>
+              )}
+
+              {/* ── Analysis Walkthrough Tab ────────────── */}
+              {activeTab === 'walkthrough' && (
+                <motion.div
+                  key="walkthrough"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <AnalysisWalkthrough data={data} />
+                </motion.div>
+              )}
+
              </AnimatePresence>
           </div>
         </div>
