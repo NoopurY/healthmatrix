@@ -125,7 +125,7 @@ function NormalCurveCard({ curveData, mean, stdDev, userValue, title, color, del
         </div>
       </div>
 
-      <div className="h-[160px] w-full">
+      <div className="h-40 w-full">
         <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
           <AreaChart data={data} margin={{ top: 5, right: 5, left: -40, bottom: 0 }}>
             <defs>
@@ -180,6 +180,7 @@ interface ConceptCardProps {
   valueColor?: string;
   accentColor: string;
   definition: string;
+  howCalculated: string;
   whyMatters: string;
   yourResult: string;
   clinicalMeaning?: string;
@@ -193,7 +194,7 @@ interface ConceptCardProps {
 
 function ConceptCard({
   id, icon, title, subtitle, value, valueColor, accentColor,
-  definition, whyMatters, yourResult, clinicalMeaning, qualBadge, qualColor,
+  definition, howCalculated, whyMatters, yourResult, clinicalMeaning, qualBadge, qualColor,
   mathFormula, learnMode, children, delay = 0,
 }: ConceptCardProps) {
   const [expanded, setExpanded] = useState(false);
@@ -247,15 +248,34 @@ function ConceptCard({
         {/* Chart / Visualization area */}
         {children && <div className="mb-4">{children}</div>}
 
-        {/* Explanation block — always visible */}
-        <div className="p-3.5 rounded-xl border mb-3" style={{ background: `${accentColor}08`, borderColor: `${accentColor}20` }}>
-          <div className="flex items-start gap-2">
-            <Info size={13} style={{ color: accentColor }} className="mt-0.5 flex-shrink-0" />
-            <p className="text-xs text-slate-400 leading-relaxed">{definition}</p>
+        {/* Beginner guide — always visible */}
+        <div className="space-y-2.5 mb-4">
+          <div className="p-3.5 rounded-xl border" style={{ background: `${accentColor}08`, borderColor: `${accentColor}20` }}>
+            <div className="flex items-center gap-2 mb-1.5">
+              <Info size={13} style={{ color: accentColor }} className="shrink-0" />
+              <p className="text-[10px] font-black text-slate-100 uppercase tracking-widest">What This Means</p>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">{definition}</p>
+          </div>
+
+          <div className="p-3.5 rounded-xl border border-cyan-500/20 bg-cyan-500/5">
+            <div className="flex items-center gap-2 mb-1.5">
+              <Zap size={13} className="text-cyan-400 shrink-0" />
+              <p className="text-[10px] font-black text-cyan-300 uppercase tracking-widest">How This Card Calculates Your Result</p>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-line">{howCalculated}</p>
+          </div>
+
+          <div className="p-3.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
+            <div className="flex items-center gap-2 mb-1.5">
+              <CheckCircle size={13} className="text-emerald-400 shrink-0" />
+              <p className="text-[10px] font-black text-emerald-300 uppercase tracking-widest">What Your Value Is Saying</p>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">{yourResult}</p>
           </div>
         </div>
 
-        {/* Clinical Meaning — ENHANCEMENT */}
+        {/* Clinical meaning */}
         {clinicalMeaning && (
           <div className="p-3.5 rounded-xl border border-white/5 bg-slate-900/40 mb-4 animate-in fade-in slide-in-from-bottom-2">
              <div className="flex items-center gap-2 mb-1.5">
@@ -276,19 +296,12 @@ function ConceptCard({
               transition={{ duration: 0.3 }}
               className="overflow-hidden"
             >
-              <div className="mt-3 space-y-2.5">
+              <div className="mt-3">
                 <div className="flex items-start gap-2 p-3 rounded-xl bg-blue-500/5 border border-blue-500/15">
-                  <BookOpen size={13} className="text-blue-400 mt-0.5 flex-shrink-0" />
+                  <BookOpen size={13} className="text-blue-400 mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-0.5">Why It Matters in Health</p>
+                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-0.5">Extra Context: Why It Matters in Health</p>
                     <p className="text-xs text-slate-400 leading-relaxed">{whyMatters}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/5 border border-amber-500/15">
-                  <Lightbulb size={13} className="text-amber-400 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-0.5">Your Result Means</p>
-                    <p className="text-xs text-slate-400 leading-relaxed">{yourResult}</p>
                   </div>
                 </div>
               </div>
@@ -350,6 +363,7 @@ export default function StatInsightEngine({ data }: StatInsightEngineProps) {
   const spearman = data.spearmanResults;
   const regExt = data.regressionExtended;
   const insights: string[] = data.insightMessages || [];
+  const poissonLambda = typeof data.poissonLambda === 'number' ? data.poissonLambda : null;
 
   // Pearson r from correlation matrix
   const keys: string[] = data.correlationKeys || [];
@@ -419,7 +433,7 @@ export default function StatInsightEngine({ data }: StatInsightEngineProps) {
   const regQual = getRegressionQual(regExt?.hr_vs_bp?.rSquared || 0);
   const bayesQual = getBayesQual(bayes?.posteriorPositive || 0);
   const normQual = getDistQual('normal', 0);
-  const poissQual = getDistQual('poisson', data.poissonLambda || 0);
+  const poissQual = getDistQual('poisson', poissonLambda ?? 0);
 
   return (
     <div className="space-y-8">
@@ -435,7 +449,7 @@ export default function StatInsightEngine({ data }: StatInsightEngineProps) {
             <Brain size={22} className="text-cyan-400" />
             Statistical Insight Engine
           </h2>
-          <p className="text-xs text-slate-500 mt-1">Every number computed, visualized, and explained</p>
+          <p className="text-xs text-slate-500 mt-1">Every card explains what it is, how it is calculated, and what your value means</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -496,7 +510,7 @@ export default function StatInsightEngine({ data }: StatInsightEngineProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="p-5 rounded-2xl bg-gradient-to-r from-slate-900/80 to-slate-900/40 border border-cyan-500/10"
+          className="p-5 rounded-2xl bg-linear-to-r from-slate-900/80 to-slate-900/40 border border-cyan-500/10"
         >
           <div className="flex items-center gap-2 mb-4">
             <Lightbulb size={16} className="text-cyan-400" />
@@ -512,7 +526,7 @@ export default function StatInsightEngine({ data }: StatInsightEngineProps) {
                 transition={{ delay: 0.1 * i }}
                 className="flex items-start gap-3 p-3 rounded-xl bg-slate-900/40 border border-white/5"
               >
-                <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 mt-1.5 flex-shrink-0" />
+                <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 mt-1.5 shrink-0" />
                 <p className="text-xs text-slate-300 leading-relaxed">{msg}</p>
               </motion.div>
             ))}
@@ -530,9 +544,10 @@ export default function StatInsightEngine({ data }: StatInsightEngineProps) {
           title="Expectation (Mean)"
           subtitle="Central tendency of health metrics"
           accentColor="#f43f5e"
-          definition="Mean represents the average value of your health metric. It gives a central estimate of your population's overall condition, acting as the 'expected value' of a random observation."
-          whyMatters="In healthcare, the mean provides a baseline snapshot. A normal mean heart rate (60–100 bpm) suggests overall cardiovascular stability. Deviations indicate systemic trends."
-          yourResult={hr ? `Mean HR = ${hr.mean} bpm. ${hr.mean > 100 ? 'Above normal range — tachycardia pattern.' : hr.mean < 60 ? 'Below normal — bradycardia pattern.' : 'Within healthy range.'}` : 'No heart rate data available.'}
+          definition="Mean is just the average. We add all values, then divide by the number of records. It tells us the center value for this group."
+          howCalculated={`1) Add all readings for the metric.\n2) Divide by total records (n=${data.totalRecords ?? '—'}).\n3) The output is the mean.\n\nHeart Rate mean: ${hr?.mean ?? '—'} bpm\nSystolic BP mean: ${bp?.mean ?? '—'} mmHg\nCholesterol mean: ${chol?.mean ?? '—'} mg/dL`}
+          whyMatters="Doctors use the average as a quick baseline. If the average is outside healthy ranges, it can suggest a group-level pattern that needs attention."
+          yourResult={hr ? `The average heart rate is ${hr.mean} bpm. ${hr.mean > 100 ? 'This is higher than the usual resting range (60-100 bpm).' : hr.mean < 60 ? 'This is lower than the usual resting range (60-100 bpm).' : 'This is inside the usual resting range (60-100 bpm).'}` : 'No heart rate data is available yet.'}
           clinicalMeaning={meanQual.meaning}
           qualBadge={meanQual.badge}
           qualColor={meanQual.color}
@@ -569,9 +584,10 @@ export default function StatInsightEngine({ data }: StatInsightEngineProps) {
           title="Variance & Stability"
           subtitle="Fluctuation analysis across metrics"
           accentColor="#f59e0b"
-          definition="Variance measures how much your values deviate from the mean. Low variance = consistent readings. High variance may indicate instability, irregular patterns, or measurement noise."
-          whyMatters="Health metrics with high variance often signal physiological dysregulation. A heart rate that swings widely could indicate arrhythmia risk or autonomic nervous system stress."
-          yourResult={hr ? `HR Variance: σ²=${hr.variance}. ${hr.variance > 200 ? '⚠ High — monitor for irregular patterns.' : hr.variance > 80 ? '🔶 Moderate variation.' : '✅ Low — very stable.'}` : 'No data.'}
+          definition="Variance shows how spread out the readings are. Low variance means steady values. High variance means the values jump around more."
+          howCalculated={`1) Find the mean (average).\n2) For each reading, measure how far it is from the mean.\n3) Square those differences, add them, and divide by (n-1).\n\nHeart Rate variance: ${hr?.variance ?? '—'}\nSystolic BP variance: ${bp?.variance ?? '—'}\nCholesterol variance: ${chol?.variance ?? '—'}`}
+          whyMatters="Stable readings are usually easier to monitor. Big swings can be a signal to check lifestyle, medication timing, stress, or other factors."
+          yourResult={hr ? `Heart rate variance is ${hr.variance}. ${hr.variance > 200 ? 'The readings are changing a lot, so pattern monitoring is important.' : hr.variance > 80 ? 'The readings show medium-level changes.' : 'The readings are fairly steady.'}` : 'No variance result is available yet.'}
           clinicalMeaning={varQual.meaning}
           qualBadge={varQual.badge}
           qualColor={varQual.color}
@@ -591,11 +607,12 @@ export default function StatInsightEngine({ data }: StatInsightEngineProps) {
           id="normal-dist"
           icon={<BarChart3 size={20} style={{ color: '#22d3ee' }} />}
           title="Normal Distribution"
-          subtitle="Bell curve model for health metrics"
+          subtitle="Bell curve (how common each value is)"
           accentColor="#22d3ee"
-          definition="The Normal Distribution is a symmetric bell-shaped probability curve. In healthcare, most physiological measurements follow this distribution around their mean, with 68% of values within ±1σ."
-          whyMatters="Understanding the distribution shape tells you if a patient's values are statistically 'normal'. Values beyond 2σ from the mean occur in only 5% of cases — a potential clinical flag."
-          yourResult={hr ? `Your population's HR follows μ=${hr.mean}, σ=${hr.stdDev}. The 95% confidence interval is [${(hr.mean - 2 * hr.stdDev).toFixed(1)}, ${(hr.mean + 2 * hr.stdDev).toFixed(1)}] bpm.` : 'Upload data to compute.'}
+          definition="A normal distribution is the bell-shaped curve. Values near the center are common, and values far from the center are rare."
+          howCalculated={hr ? `1) Use mean (center) and standard deviation (spread).\n2) Build the bell curve from those two numbers.\n3) Read how likely each value is from the curve.\n\nFor Heart Rate: mean=${hr.mean}, std dev=${hr.stdDev}\n68% of values are expected in ${(hr.mean - hr.stdDev).toFixed(1)} to ${(hr.mean + hr.stdDev).toFixed(1)} bpm\n95% of values are expected in ${(hr.mean - 2 * hr.stdDev).toFixed(1)} to ${(hr.mean + 2 * hr.stdDev).toFixed(1)} bpm` : 'Upload data to generate the bell curve and probability ranges.'}
+          whyMatters="This helps you quickly see if a value is common or unusual for this dataset."
+          yourResult={hr ? `Most heart-rate values in this dataset are expected near ${hr.mean} bpm. Values much lower or higher than the 95% range can be treated as uncommon and checked further.` : 'Upload data to compute the normal range.'}
           clinicalMeaning={normQual.meaning}
           qualBadge={normQual.badge}
           qualColor={normQual.color}
@@ -630,20 +647,21 @@ export default function StatInsightEngine({ data }: StatInsightEngineProps) {
           id="poisson-dist"
           icon={<Zap size={20} style={{ color: '#a855f7' }} />}
           title="Poisson Distribution"
-          subtitle="Rare event modeling in cardiac data"
+          subtitle="Rare-event counter (how often uncommon events happen)"
           accentColor="#a855f7"
-          definition="Poisson distribution models the probability of a given number of rare events occurring in a fixed interval. In cardiology, it models irregular heartbeat occurrences or rare cardiac events."
-          whyMatters="Arrhythmias, ectopic beats, and other rare cardiac events are naturally Poisson-distributed. The rate parameter λ indicates the average number of such events — higher λ means more frequent occurrences."
-          yourResult={data.poissonLambda ? `λ = ${data.poissonLambda} (derived from mean HR band). The most probable event count (mode) is ${Math.max(0, data.poissonLambda - 1)}–${data.poissonLambda}.` : 'No Poisson data.'}
+          definition="Poisson (say 'pwa-son') distribution estimates how many rare events can happen in one fixed window. Here, the bars show chance for 0 events, 1 event, 2 events, and so on."
+          howCalculated={poissonLambda !== null ? `1) Estimate lambda (lambda) = average rare events per window.\n2) For each event count k, compute P(X=k).\n3) Plot each probability as a bar in the graph.\n\nThis card uses lambda=${poissonLambda}.\nHighest bar (most likely count) is near k=${Math.max(0, Math.round(poissonLambda - 1))} to k=${Math.round(poissonLambda)}.` : 'No lambda value was found, so Poisson probabilities could not be generated yet.'}
+          whyMatters="If rare events become more frequent, it can be an early warning trend."
+          yourResult={poissonLambda !== null ? `Your lambda value is ${poissonLambda}. A bigger lambda means rare events are expected more often in each time window.` : 'No Poisson result is available yet.'}
           clinicalMeaning={poissQual.meaning}
           qualBadge={poissQual.badge}
           qualColor={poissQual.color}
-          mathFormula={`P(X=k) = (λᵏ × e^(-λ)) / k!\n\nλ = ${data.poissonLambda ?? '—'} (HR / 10 bpm bands)\nP(X=0) = e^(-${data.poissonLambda}) = ${data.poissonLambda ? (Math.exp(-data.poissonLambda) * 100).toFixed(2) : '—'}%`}
+          mathFormula={`P(X=k) = (λᵏ × e^(-λ)) / k!\n\nλ = ${poissonLambda ?? '—'} (HR / 10 bpm bands)\nP(X=0) = e^(-${poissonLambda ?? 'λ'}) = ${poissonLambda !== null ? (Math.exp(-poissonLambda) * 100).toFixed(2) : '—'}%`}
           learnMode={learnMode}
           delay={0.2}
         >
           {data.poissonDistribution?.length > 0 && (
-            <PoissonChart data={data.poissonDistribution} lambda={data.poissonLambda} delay={0.25} />
+            <PoissonChart data={data.poissonDistribution} lambda={poissonLambda ?? 0} delay={0.25} />
           )}
         </ConceptCard>
 
@@ -656,9 +674,10 @@ export default function StatInsightEngine({ data }: StatInsightEngineProps) {
           value={bayes ? `${(bayes.posteriorPositive * 100).toFixed(1)}%` : '—'}
           valueColor="#a855f7"
           accentColor="#a855f7"
-          definition="Bayes theorem updates the probability of a condition based on new evidence. It combines prior knowledge (base rate) with test sensitivity and specificity to compute a posterior probability."
-          whyMatters="In clinical diagnosis, a positive test result doesn't simply mean disease — its meaning depends on disease prevalence. Bayes adjusts the probability correctly, preventing over- or under-diagnosis."
-          yourResult={bayes ? `Prior risk: 30%. After evidence (cholesterol pattern): ${(bayes.posteriorPositive * 100).toFixed(1)}% (positive test), ${(bayes.posteriorNegative * 100).toFixed(1)}% (negative test). Likelihood Ratio: ${bayes.likelihoodRatio}.` : 'No Bayes data.'}
+          definition="Bayes theorem updates an old guess using new evidence. Start with a base risk, then adjust it after a test signal."
+          howCalculated={bayes ? `1) Start with prior risk (before new evidence): ${(bayes.priorProbability ?? 0.30) * 100}%.\n2) Use test quality: sensitivity ${(bayes.sensitivity ?? 0.85) * 100}% and specificity ${(bayes.specificity ?? 0.70) * 100}%.\n3) Compute updated risk (posterior).\n\nPosterior after positive signal: ${(bayes.posteriorPositive * 100).toFixed(1)}%\nPosterior after negative signal: ${(bayes.posteriorNegative * 100).toFixed(1)}%` : 'Bayesian update needs prior risk, sensitivity, and specificity values.'}
+          whyMatters="It prevents overreaction to one test result by combining both the test quality and the starting risk."
+          yourResult={bayes ? `After applying Bayes update, risk rises to ${(bayes.posteriorPositive * 100).toFixed(1)}% when evidence is positive and drops to ${(bayes.posteriorNegative * 100).toFixed(1)}% when evidence is negative.` : 'No Bayes result is available yet.'}
           clinicalMeaning={bayesQual.meaning}
           qualBadge={bayesQual.badge}
           qualColor={bayesQual.color}
@@ -685,9 +704,10 @@ export default function StatInsightEngine({ data }: StatInsightEngineProps) {
           title="Karl Pearson Correlation"
           subtitle="Linear relationship between health metrics"
           accentColor="#22d3ee"
-          definition="Pearson correlation coefficient (r) quantifies the linear relationship between two variables, ranging from -1 (perfect negative) to +1 (perfect positive). Zero indicates no linear relationship."
-          whyMatters="Understanding which metrics move together reveals cardiovascular co-dependencies. High positive r between Heart Rate and BP suggests both increase under similar physiological stress."
-          yourResult={`HR vs BP: r=${pearsonHrBp.toFixed(3)} (${hrBpStrength.label}). Cholesterol vs BP: r=${pearsonCholBp.toFixed(3)} (${cholBpStrength.label}).`}
+          definition="Pearson correlation tells whether two values move together in a straight-line way. It goes from -1 to +1. Near +1 means rise together, near -1 means one rises while the other falls, near 0 means weak straight-line link."
+          howCalculated={`1) Pair each record's two values (example: heart rate and BP).\n2) Compare how both values move away from their own averages.\n3) Convert that pattern into one score r between -1 and +1.\n\nHR vs BP: r=${pearsonHrBp.toFixed(3)}\nCholesterol vs BP: r=${pearsonCholBp.toFixed(3)}`}
+          whyMatters="It helps spot which health numbers tend to move together. That can guide what to monitor first."
+          yourResult={`HR vs BP has r=${pearsonHrBp.toFixed(3)} (${hrBpStrength.label}). Cholesterol vs BP has r=${pearsonCholBp.toFixed(3)} (${cholBpStrength.label}).`}
           clinicalMeaning={`The linear link between your vitals is rated as ${hrBpStrength.label}. This helps doctors understand if health factors are reacting in sync.`}
           qualBadge={hrBpStrength.label.toUpperCase()}
           qualColor={hrBpStrength.color}
@@ -760,9 +780,10 @@ export default function StatInsightEngine({ data }: StatInsightEngineProps) {
           title="Spearman Rank Correlation"
           subtitle="Non-parametric rank-based relationship"
           accentColor="#10b981"
-          definition="Spearman's ρ (rho) measures the strength of a monotonic relationship between variables by converting values into ranks. Unlike Pearson, it works even for non-linear or non-normal distributions."
-          whyMatters="Medical data often contains outliers or non-Gaussian distributions. Spearman is more robust in these cases — it captures true health relationships even when data isn't perfectly bell-shaped."
-          yourResult={spearman ? `HR vs BP: ρ=${spearman.hr_vs_bp} · Chol vs BP: ρ=${spearman.cholesterol_vs_bp} · Age vs HR: ρ=${spearman.age_vs_hr}` : 'No Spearman data.'}
+          definition="Spearman correlation compares ranks, not raw values. It checks whether higher values of one metric usually match higher (or lower) values of another metric, even if the pattern is curved."
+          howCalculated={spearman ? `1) Replace each value with its rank (1st, 2nd, 3rd...).\n2) Compare rank differences between the two metrics.\n3) Convert to rho score between -1 and +1.\n\nHR vs BP: rho=${spearman.hr_vs_bp}\nCholesterol vs BP: rho=${spearman.cholesterol_vs_bp}\nAge vs HR: rho=${spearman.age_vs_hr}` : 'No ranked-correlation data is available yet.'}
+          whyMatters="This method is useful when data is noisy or not perfectly bell-shaped."
+          yourResult={spearman ? `Rank-based links are: HR vs BP rho=${spearman.hr_vs_bp}, Cholesterol vs BP rho=${spearman.cholesterol_vs_bp}, and Age vs HR rho=${spearman.age_vs_hr}.` : 'No Spearman result is available yet.'}
           clinicalMeaning="Spearman analysis ensures we don't miss hidden health relationships just because your data doesn't follow a perfect straight line."
           qualBadge="ROBUST MODEL"
           qualColor="#10b981"
@@ -801,9 +822,10 @@ export default function StatInsightEngine({ data }: StatInsightEngineProps) {
           title="Regression Analysis"
           subtitle="Predictive trend modeling"
           accentColor="#f59e0b"
-          definition="Linear regression fits a straight line (y = mx + b) through the data to model the dependency of one variable on another. R² measures how well the regression explains variability."
-          whyMatters="Regression allows clinicians to predict future metric values based on known inputs. For example, predicting what BP will be at a given heart rate helps anticipate hypertension risk."
-          yourResult={regExt?.hr_vs_bp ? `HR→BP: y = ${regExt.hr_vs_bp.slope}×HR + ${regExt.hr_vs_bp.intercept}, R²=${regExt.hr_vs_bp.rSquared}. ${regExt.hr_vs_bp.rSquared > 0.5 ? 'Strong predictive relationship.' : 'Moderate/weak prediction — other factors involved.'}` : 'No regression data.'}
+          definition="Regression draws the best straight trend line through points. It gives an equation you can use to estimate one value from another."
+          howCalculated={regExt?.hr_vs_bp ? `1) Plot points (x=heart rate, y=BP).\n2) Find the line that best fits all points.\n3) Read slope, intercept, and R-squared (fit quality).\n\nLine: y=${regExt.hr_vs_bp.slope}x + ${regExt.hr_vs_bp.intercept}\nFit score (R-squared): ${regExt.hr_vs_bp.rSquared}` : 'No regression data is available yet.'}
+          whyMatters="It helps estimate future or missing values and shows whether one metric can reasonably predict another."
+          yourResult={regExt?.hr_vs_bp ? `The model predicts BP from heart rate using y=${regExt.hr_vs_bp.slope}x + ${regExt.hr_vs_bp.intercept}. R-squared is ${regExt.hr_vs_bp.rSquared}, so the prediction strength is ${regExt.hr_vs_bp.rSquared > 0.5 ? 'strong' : 'moderate to weak'}.` : 'No regression result is available yet.'}
           clinicalMeaning={regQual.meaning}
           qualBadge={regQual.badge}
           qualColor={regQual.color}
@@ -846,7 +868,7 @@ export default function StatInsightEngine({ data }: StatInsightEngineProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.6 }}
-        className="p-5 rounded-2xl border border-white/5 bg-gradient-to-br from-slate-900/60 to-slate-900/20"
+        className="p-5 rounded-2xl border border-white/5 bg-linear-to-br from-slate-900/60 to-slate-900/20"
       >
         <div className="flex items-center gap-2 mb-4">
           <CheckCircle size={16} className="text-emerald-400" />
@@ -862,7 +884,7 @@ export default function StatInsightEngine({ data }: StatInsightEngineProps) {
             { title: 'Prediction Model', desc: `R²=${regExt?.hr_vs_bp?.rSquared ?? '—'} — regression model fit for BP from HR`, icon: TrendingUp, color: '#f59e0b' },
           ].map(({ title, desc, icon: Icon, color: c }) => (
             <div key={title} className="flex items-start gap-3 p-3 rounded-xl bg-white/3 border border-white/5">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${c}15` }}>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${c}15` }}>
                 <Icon size={14} style={{ color: c }} />
               </div>
               <div>
