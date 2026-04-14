@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import PoissonChart from '@/components/charts/PoissonChart';
-import SpearmanScatter from '@/components/charts/SpearmanScatter';
 import RegressionPlot from '@/components/charts/RegressionPlot';
 import VarianceBar from '@/components/charts/VarianceBar';
 import BayesCompareBar from '@/components/charts/BayesCompareBar';
@@ -24,7 +23,232 @@ interface StatInsightEngineProps {
   data: any;
 }
 
+interface SpearmanSolveRow {
+  idx: number;
+  x: number;
+  y: number;
+  rankX: number;
+  rankY: number;
+  d: number;
+  d2: number;
+}
+
+interface SpearmanSolveResult {
+  n: number;
+  sumD2: number;
+  rhoFormula: number;
+  rhoPearson: number;
+  rows: SpearmanSolveRow[];
+}
+
 // ── Helpers ──────────────────────────────────────────────────────
+
+function rankWithTies(values: number[]): number[] {
+  const sorted = values
+    .map((value, originalIndex) => ({ value, originalIndex }))
+    .sort((a, b) => a.value - b.value);
+
+  const ranks = new Array(values.length).fill(0);
+  let i = 0;
+
+  while (i < sorted.length) {
+    let j = i;
+    while (j + 1 < sorted.length && sorted[j + 1].value === sorted[i].value) {
+      j += 1;
+    }
+
+    const avgRank = (i + 1 + j + 1) / 2;
+    for (let k = i; k <= j; k += 1) {
+      ranks[sorted[k].originalIndex] = avgRank;
+    }
+
+    i = j + 1;
+  }
+
+  return ranks;
+}
+
+function pearsonOnArrays(x: number[], y: number[]): number {
+  if (x.length !== y.length || x.length < 2) return 0;
+
+  const n = x.length;
+  const meanX = x.reduce((sum, value) => sum + value, 0) / n;
+  const meanY = y.reduce((sum, value) => sum + value, 0) / n;
+
+  let numerator = 0;
+  let denomX = 0;
+  let denomY = 0;
+
+  for (let i = 0; i < n; i += 1) {
+    const dx = x[i] - meanX;
+    const dy = y[i] - meanY;
+    numerator += dx * dy;
+    denomX += dx * dx;
+    denomY += dy * dy;
+  }
+
+  const denom = Math.sqrt(denomX * denomY);
+  return denom === 0 ? 0 : numerator / denom;
+}
+
+function buildSpearmanSolve(records: any[], xKey: string, yKey: string): SpearmanSolveResult | null {
+  const pairs = records
+    .map((record, idx) => ({
+      idx: idx + 1,
+      x: Number(record?.[xKey]),
+      y: Number(record?.[yKey]),
+    }))
+    .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+
+  if (pairs.length < 2) return null;
+
+  const xValues = pairs.map((p) => p.x);
+  const yValues = pairs.map((p) => p.y);
+  const rankX = rankWithTies(xValues);
+  const rankY = rankWithTies(yValues);
+
+  const rows = pairs.map((pair, i) => {
+    const d = rankX[i] - rankY[i];
+    return {
+      idx: pair.idx,
+      x: pair.x,
+      y: pair.y,
+      rankX: rankX[i],
+      rankY: rankY[i],
+      d,
+      d2: d * d,
+    };
+  });
+
+  const n = rows.length;
+  const sumD2 = rows.reduce((sum, row) => sum + row.d2, 0);
+  const rhoFormula = 1 - (6 * sumD2) / (n * (n * n - 1));
+  const rhoPearson = pearsonOnArrays(rankX, rankY);
+
+  return {
+    n,
+    sumD2,
+    rhoFormula,
+    rhoPearson,
+    rows,
+  };
+}
+
+function spearmanStrengthLabel(rho: number) {
+  const abs = Math.abs(rho);
+  if (abs > 0.8) return 'Very Strong';
+  if (abs > 0.6) return 'Strong';
+  if (abs > 0.4) return 'Moderate';
+  if (abs > 0.2) return 'Weak';
+  return 'Very Weak';
+}
+
+function formatSolveNumber(value: number, decimals = 2) {
+  return Number(value.toFixed(decimals));
+}
+
+function SpearmanSolvePanel({
+  title,
+  xLabel,
+  yLabel,
+  solve,
+  rho,
+  accent,
+}: {
+  title: string;
+  xLabel: string;
+  yLabel: string;
+  solve: SpearmanSolveResult;
+  rho: number;
+  accent: string;
+}) {
+  const rowsToShow = solve.rows.slice(0, 12);
+  const direction = rho > 0 ? 'positive monotonic' : rho < 0 ? 'negative monotonic' : 'no clear monotonic';
+
+  return (
+    <div className="p-4 rounded-2xl bg-slate-900/50 border border-white/10">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div>
+          <p className="text-sm font-bold text-slate-100">{title}</p>
+          <p className="text-[11px] text-slate-500 mt-1">Step-by-step rank assignment and rho solving</p>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Final ρ</p>
+          <p className="text-xl font-black mono" style={{ color: accent }}>{rho.toFixed(4)}</p>
+        </div>
+      </div>
+
+      <div className="p-3 rounded-xl border border-white/10 bg-slate-950/60 mb-3">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">How Solved</p>
+        <p className="text-xs text-slate-300 leading-relaxed">
+          1) Rank each {xLabel} and {yLabel} value. 2) Compute d = rank({xLabel}) - rank({yLabel}). 3) Square and sum d².
+          4) Compute rho using ρ = 1 - (6Σd²)/(n(n²-1)). 5) Confirm final rho via Pearson on ranked arrays.
+        </p>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-white/10">
+        <table className="w-full text-[10px] text-left">
+          <thead className="bg-slate-950/80 text-slate-400 uppercase tracking-widest">
+            <tr>
+              <th className="px-3 py-2">#</th>
+              <th className="px-3 py-2">{xLabel}</th>
+              <th className="px-3 py-2">{yLabel}</th>
+              <th className="px-3 py-2">Rank X</th>
+              <th className="px-3 py-2">Rank Y</th>
+              <th className="px-3 py-2">d</th>
+              <th className="px-3 py-2">d²</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rowsToShow.map((row) => (
+              <tr key={row.idx} className="border-t border-white/5 text-slate-300">
+                <td className="px-3 py-1.5 mono">{row.idx}</td>
+                <td className="px-3 py-1.5 mono">{formatSolveNumber(row.x, 1)}</td>
+                <td className="px-3 py-1.5 mono">{formatSolveNumber(row.y, 1)}</td>
+                <td className="px-3 py-1.5 mono">{formatSolveNumber(row.rankX, 2)}</td>
+                <td className="px-3 py-1.5 mono">{formatSolveNumber(row.rankY, 2)}</td>
+                <td className="px-3 py-1.5 mono">{formatSolveNumber(row.d, 2)}</td>
+                <td className="px-3 py-1.5 mono">{formatSolveNumber(row.d2, 2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-[10px] text-slate-500 mt-2">
+        Showing first {rowsToShow.length} rows for readability. Full rho uses all n={solve.n} rows.
+      </p>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mt-3">
+        <div className="p-2 rounded-lg bg-white/5 border border-white/10">
+          <p className="text-[9px] uppercase tracking-widest text-slate-500">n</p>
+          <p className="text-sm font-black mono text-slate-100">{solve.n}</p>
+        </div>
+        <div className="p-2 rounded-lg bg-white/5 border border-white/10">
+          <p className="text-[9px] uppercase tracking-widest text-slate-500">Σd²</p>
+          <p className="text-sm font-black mono text-slate-100">{formatSolveNumber(solve.sumD2, 2)}</p>
+        </div>
+        <div className="p-2 rounded-lg bg-white/5 border border-white/10">
+          <p className="text-[9px] uppercase tracking-widest text-slate-500">ρ (Formula)</p>
+          <p className="text-sm font-black mono" style={{ color: accent }}>{solve.rhoFormula.toFixed(4)}</p>
+        </div>
+        <div className="p-2 rounded-lg bg-white/5 border border-white/10">
+          <p className="text-[9px] uppercase tracking-widest text-slate-500">ρ (Rank Pearson)</p>
+          <p className="text-sm font-black mono" style={{ color: accent }}>{solve.rhoPearson.toFixed(4)}</p>
+        </div>
+      </div>
+
+      <div className="mt-3 p-3 rounded-xl border border-white/10 bg-slate-950/70">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Interpretation</p>
+        <p className="text-xs text-slate-300">
+          Relationship is <span className="font-bold" style={{ color: accent }}>{direction}</span> with
+          <span className="font-bold" style={{ color: accent }}> {spearmanStrengthLabel(rho)}</span> strength.
+          A higher absolute rho means stronger rank-order consistency.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function MeanPositionIndicator({ mean, min, max, unit, label }: { mean: number; min: number; max: number; unit: string; label: string }) {
   const normalMin = label === 'Heart Rate' ? 60 : label === 'Systolic BP' ? 90 : 150;
@@ -362,8 +586,13 @@ export default function StatInsightEngine({ data }: StatInsightEngineProps) {
   const bayes = data.bayesPrediction;
   const spearman = data.spearmanResults;
   const regExt = data.regressionExtended;
+  const records: any[] = Array.isArray(data.records) ? data.records : [];
   const insights: string[] = data.insightMessages || [];
   const poissonLambda = typeof data.poissonLambda === 'number' ? data.poissonLambda : null;
+
+  const spearmanSolveHrBp = buildSpearmanSolve(records, 'heart_rate', 'systolic_bp');
+  const spearmanSolveCholBp = buildSpearmanSolve(records, 'cholesterol', 'systolic_bp');
+  const spearmanSolveAgeHr = buildSpearmanSolve(records, 'age', 'heart_rate');
 
   // Pearson r from correlation matrix
   const keys: string[] = data.correlationKeys || [];
@@ -791,24 +1020,36 @@ export default function StatInsightEngine({ data }: StatInsightEngineProps) {
           learnMode={learnMode}
           delay={0.35}
         >
-          {spearman && regExt && (
-            <div className={detailMode === 'detailed' ? 'grid grid-cols-2 gap-4' : ''}>
-              <SpearmanScatter
-                data={regExt.hr_vs_bp.scatter}
-                rho={spearman.hr_vs_bp}
+          {spearman && spearmanSolveHrBp && (
+            <div className="space-y-4">
+              <SpearmanSolvePanel
+                title="Worked Solution: Heart Rate vs Systolic BP"
                 xLabel="Heart Rate"
                 yLabel="Systolic BP"
-                color="#10b981"
-                delay={0.4}
+                solve={spearmanSolveHrBp}
+                rho={spearman.hr_vs_bp}
+                accent="#10b981"
               />
-              {detailMode === 'detailed' && (
-                <SpearmanScatter
-                  data={regExt.age_vs_cholesterol.scatter}
-                  rho={spearman.age_vs_hr}
+
+              {detailMode === 'detailed' && spearmanSolveCholBp && (
+                <SpearmanSolvePanel
+                  title="Worked Solution: Cholesterol vs Systolic BP"
+                  xLabel="Cholesterol"
+                  yLabel="Systolic BP"
+                  solve={spearmanSolveCholBp}
+                  rho={spearman.cholesterol_vs_bp}
+                  accent="#f59e0b"
+                />
+              )}
+
+              {detailMode === 'detailed' && spearmanSolveAgeHr && (
+                <SpearmanSolvePanel
+                  title="Worked Solution: Age vs Heart Rate"
                   xLabel="Age"
-                  yLabel="Cholesterol"
-                  color="#f59e0b"
-                  delay={0.5}
+                  yLabel="Heart Rate"
+                  solve={spearmanSolveAgeHr}
+                  rho={spearman.age_vs_hr}
+                  accent="#22d3ee"
                 />
               )}
             </div>
