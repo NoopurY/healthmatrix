@@ -22,7 +22,7 @@ export default function CSVDropzone({ onUpload, isLoading }: CSVDropzoneProps) {
 
   const handleFile = useCallback(async (file: File) => {
     setError('');
-    if (!file.name.endsWith('.csv')) {
+    if (!file.name.toLowerCase().endsWith('.csv')) {
       setError('Please upload a CSV file');
       return;
     }

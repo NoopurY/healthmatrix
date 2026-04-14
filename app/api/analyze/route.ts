@@ -12,19 +12,68 @@ const UPLOAD_DIR = join(process.cwd(), 'public', 'uploads');
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { savedName, originalName, type, size } = body;
+    let savedName: string | undefined;
+    let originalName: string | undefined;
+    let type: string | undefined;
+    let size = 0;
+    let csvContent: string | undefined;
 
-    if (!savedName || !type) {
+    const contentType = req.headers.get('content-type') || '';
+
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await req.formData();
+      const file = formData.get('file') as File | null;
+
+      if (!file) {
+        return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+      }
+
+      type = String(formData.get('type') || '').toLowerCase();
+      originalName = String(formData.get('originalName') || file.name || 'upload');
+      size = Number(formData.get('size') || file.size || 0);
+
+      if (!type) {
+        const ext = file.name.split('.').pop()?.toLowerCase() || '';
+        type = ext === 'csv' ? 'csv' : 'ecg';
+      }
+
+      if (type === 'csv') {
+        csvContent = await file.text();
+      }
+    } else {
+      const body = await req.json();
+      savedName = body.savedName;
+      originalName = body.originalName;
+      type = body.type;
+      size = Number(body.size || 0);
+    }
+
+    if (!type) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const filePath = join(UPLOAD_DIR, savedName);
     const reportId = uuidv4();
 
     if (type === 'csv') {
       // ── CSV Analysis ─────────────────────────────────────
-      const content = await readFile(filePath, 'utf-8');
+      let content = csvContent;
+
+      if (!content) {
+        if (!savedName) {
+          return NextResponse.json({ error: 'Missing uploaded CSV content' }, { status: 400 });
+        }
+
+        const filePath = join(UPLOAD_DIR, savedName);
+        try {
+          content = await readFile(filePath, 'utf-8');
+        } catch {
+          return NextResponse.json(
+            { error: 'Uploaded file is no longer available. Please upload again.' },
+            { status: 410 }
+          );
+        }
+      }
+
       const analysis = analyzeCSV(content);
 
       if (analysis.totalCount === 0) {
@@ -114,7 +163,12 @@ export async function POST(req: NextRequest) {
 
     } else if (type === 'ecg') {
       // ── ECG Analysis ─────────────────────────────────────
-      const metadata = { filename: originalName, size, type, uploadedAt: new Date().toISOString() };
+      const metadata = {
+        filename: originalName || 'ecg-upload',
+        size,
+        type,
+        uploadedAt: new Date().toISOString(),
+      };
       const ecgFeatures = simulateECGFeatures(metadata);
       const ecgWaveform = generateECGWaveform(ecgFeatures, 5);
       const ecgAnalysis = await analyzeECG(ecgFeatures);

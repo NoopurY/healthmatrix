@@ -14,7 +14,12 @@ import NeonBadge from '@/components/ui/NeonBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type TabType = 'csv' | 'ecg';
-interface UploadInfo { savedName: string; originalName: string; type: string; size: number; }
+interface UploadInfo {
+  originalName: string;
+  type: TabType;
+  size: number;
+  file: File;
+}
 
 // ── Step indicator ────────────────────────────────────────
 
@@ -68,20 +73,16 @@ function Dropzone({ type, onUpload }: { type: TabType; onUpload: (info: UploadIn
   const ref = useRef<HTMLInputElement>(null);
   
   const handle = useCallback(async (file: File) => {
-    if (type === 'csv' && !file.name.endsWith('.csv')) { setError('CSV files only (.csv)'); return; }
+    const fileNameLower = file.name.toLowerCase();
+    if (type === 'csv' && !fileNameLower.endsWith('.csv')) { setError('CSV files only (.csv)'); return; }
     if (type === 'ecg' && !['png','jpg','jpeg','bmp','pdf'].includes(file.name.split('.').pop()?.toLowerCase() || '')) {
       setError('Format not supported (PNG/JPG/PDF only)'); return;
     }
     
     setError(''); setUploading(true);
-    const fd = new FormData(); fd.append('file', file);
-    
     try {
-      const r = await fetch('/api/upload', { method: 'POST', body: fd });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error);
-      onUpload({ savedName: d.savedName, originalName: d.originalName, type, size: d.size });
-    } catch (e: any) { setError(e.message); }
+      onUpload({ originalName: file.name, type, size: file.size, file });
+    } catch (e: any) { setError(e.message || 'Upload failed'); }
     finally { setUploading(false); }
   }, [type, onUpload]);
 
@@ -154,10 +155,15 @@ export default function UploadPage() {
     setAnalyzing(true);
     setStep(2);
     try {
+      const formData = new FormData();
+      formData.append('file', uploadInfo.file);
+      formData.append('type', uploadInfo.type);
+      formData.append('originalName', uploadInfo.originalName);
+      formData.append('size', String(uploadInfo.size));
+
       const r = await fetch('/api/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(uploadInfo),
+        body: formData,
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Analysis failed');
