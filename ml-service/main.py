@@ -12,6 +12,8 @@ import logging
 
 from models.risk_model import RiskPredictor
 from models.ecg_analyzer import ECGAnalyzer
+from train_model import train as train_model_func
+from utils.forecaster import HealthForecaster
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,6 +35,7 @@ app.add_middleware(
 # Initialize models on startup
 risk_predictor = RiskPredictor()
 ecg_analyzer = ECGAnalyzer()
+forecaster = HealthForecaster()
 
 
 # ── Schemas ──────────────────────────────────────────────────
@@ -62,6 +65,11 @@ class ECGFeatures(BaseModel):
     pr_interval: Optional[float] = 160
     qrs_duration: Optional[float] = 90
     qt_interval: Optional[float] = 400
+
+
+class ForecastRequest(BaseModel):
+    historical_data: List[Dict]
+    steps: Optional[int] = 6
 
 
 # ── Routes ───────────────────────────────────────────────────
@@ -148,6 +156,47 @@ async def analyze_ecg(features: ECGFeatures):
         return result
     except Exception as e:
         logger.error(f"ECG analysis error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/train")
+async def trigger_training():
+    """
+    Trigger the training pipeline and reload the model.
+    """
+    try:
+        logger.info("Training trigger received via API...")
+        success = train_model_func()
+        if success:
+            # Re-initialize predictor to load the new weights
+            global risk_predictor
+            risk_predictor = RiskPredictor()
+            return {
+                "status": "success",
+                "message": "Model trained and reloaded successfully.",
+                "is_trained": risk_predictor.is_trained
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Training failed. Check logs for details.")
+    except Exception as e:
+        logger.error(f"Training error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/forecast")
+async def generate_forecast(request: ForecastRequest):
+    """
+    Generate future health trend forecasts.
+    """
+    try:
+        result = forecaster.forecast(request.historical_data, request.steps)
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Forecasting error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

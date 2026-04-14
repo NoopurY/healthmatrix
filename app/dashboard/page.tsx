@@ -14,10 +14,13 @@ import DistributionCurve from '@/components/charts/DistributionCurve';
 import CorrelationHeatmap from '@/components/charts/CorrelationHeatmap';
 import RiskGauge from '@/components/charts/RiskGauge';
 import FeatureImportance from '@/components/charts/FeatureImportance';
+import ForecastingPlot from '@/components/charts/ForecastingPlot';
 import ECGWaveform from '@/components/charts/ECGWaveform';
 import RiskDistributionPie from '@/components/charts/RiskDistributionPie';
 import StatInsightEngine from '@/components/dashboard/StatInsightEngine';
 import AnalysisWalkthrough from '@/components/dashboard/AnalysisWalkthrough';
+import AIInsightCard from '@/components/dashboard/AIInsightCard';
+import CorrelationEngine from '@/components/dashboard/CorrelationEngine';
 import GlassCard from '@/components/ui/GlassCard';
 import NeonBadge from '@/components/ui/NeonBadge';
 import Link from 'next/link';
@@ -290,12 +293,20 @@ export default function DashboardPage() {
                   {/* Warning / Alerts Block */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <RiskGauge score={Math.round(riskScore)} level={riskLevel} />
-                    <RiskAlert 
-                      riskLevel={riskLevel} 
+                    <AIInsightCard 
+                      metrics={data.stats} 
                       riskScore={Math.round(riskScore)} 
-                      recommendations={recommendations} 
-                      bayesProbability={data.bayesPrediction?.posteriorPositive} 
+                      profile={{ type: isCSV ? 'Batch' : 'Individual', records: data.totalRecords }}
+                      delay={0.5}
                     />
+                    <div className="lg:col-span-2">
+                      <RiskAlert 
+                        riskLevel={riskLevel} 
+                        riskScore={Math.round(riskScore)} 
+                        recommendations={recommendations} 
+                        bayesProbability={data.bayesPrediction?.posteriorPositive} 
+                      />
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -332,6 +343,20 @@ export default function DashboardPage() {
                       />
                     )}
                   </div>
+
+                  <div className="grid grid-cols-1 gap-8">
+                    {data.timeSeries && (
+                      <ForecastingPlot 
+                        historicalData={data.timeSeries.map((d: any) => ({ index: d.index, value: d.heart_rate }))}
+                        title="Heart Rate"
+                        unit="bpm"
+                        color="#f43f5e"
+                      />
+                    )}
+                  </div>
+
+                  <CorrelationEngine data={data} />
+
                   <BayesPanel data={data.bayesPrediction} />
                   {data.correlationMatrix?.length > 0 && (
                     <CorrelationHeatmap matrix={data.correlationMatrix} keys={data.correlationKeys} />
@@ -351,7 +376,14 @@ export default function DashboardPage() {
                 >
                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                       {ml?.feature_importance && <FeatureImportance data={ml.feature_importance} />}
-                      <RiskGauge score={Math.round(riskScore)} level={riskLevel} />
+                      <div className="space-y-8">
+                        <RiskGauge score={Math.round(riskScore)} level={riskLevel} />
+                        <AIInsightCard 
+                          metrics={data.stats} 
+                          riskScore={Math.round(riskScore)} 
+                          profile={{ type: isCSV ? 'Batch' : 'Individual', records: data.totalRecords }}
+                        />
+                      </div>
                    </div>
                    <RiskAlert 
                     riskLevel={riskLevel} 

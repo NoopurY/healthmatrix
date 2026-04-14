@@ -1,0 +1,209 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import {
+  XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, AreaChart, Area, ComposedChart, Line,
+} from 'recharts';
+import GlassCard from '../ui/GlassCard';
+import { TrendingUp, Calendar, AlertTriangle, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
+
+interface ForecastingPlotProps {
+  historicalData: { index: number; value: number }[];
+  title: string;
+  unit: string;
+  color?: string;
+}
+
+export default function ForecastingPlot({ historicalData, title, unit, color = '#22d3ee' }: ForecastingPlotProps) {
+  const [forecastData, setForecastData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function getForecast() {
+      try {
+        setLoading(true);
+        const response = await fetch(`${process.env.NEXT_PUBLIC_ML_SERVICE_URL || 'http://localhost:8000'}/forecast`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            historical_data: historicalData.map(d => ({ value: d.value })),
+            steps: 6
+          }),
+        });
+
+        if (!response.ok) throw new Error('Forecasting service offline');
+
+        const data = await response.json();
+        
+        // Merge historical and forecast
+        const lastIdx = historicalData[historicalData.length - 1].index;
+        const combined = [
+          ...historicalData.map(d => ({ ...d, isForecast: false, upper: d.value, lower: d.value })),
+          ...data.forecast.map((v: number, i: number) => ({
+            index: lastIdx + i + 1,
+            value: v,
+            upper: data.upper_bound[i],
+            lower: data.lower_bound[i],
+            isForecast: true
+          }))
+        ];
+        
+        setForecastData(combined);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (historicalData.length >= 3) {
+      getForecast();
+    } else {
+      setLoading(false);
+      setError('Insufficient data for forecasting');
+    }
+  }, [historicalData]);
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="glass-premium p-4 border border-white/10 rounded-xl shadow-2xl">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">
+            {data.isForecast ? `Forecast Step +${label - historicalData.length + 1}` : `Historical Point #${label}`}
+          </p>
+          <div className="flex items-center gap-2">
+             <span className="text-sm font-black mono text-white">{payload[0].value.toFixed(1)}</span>
+             <span className="text-[10px] font-bold text-slate-500">{unit}</span>
+          </div>
+          {data.isForecast && (
+            <p className="text-[9px] text-cyan-500/80 font-bold mt-1 uppercase">95% Confidence Interval</p>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <GlassCard className="h-[400px] relative overflow-hidden">
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
+            <TrendingUp className="text-cyan-400" size={20} />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-slate-100">{title} Forecasting</h3>
+            <p className="text-xs text-slate-500">ML-driven trajectory projection (Next 6 Steps)</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+           <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-800 border border-white/5 text-[9px] font-bold text-slate-400">
+             <Calendar size={12} /> T+6 Months
+           </div>
+        </div>
+      </div>
+
+      <div className="h-[280px] w-full relative">
+        {loading ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500">
+            <Loader2 className="animate-spin mb-4" size={24} />
+            <p className="text-[10px] font-bold uppercase tracking-widest">Running regression models...</p>
+          </div>
+        ) : error ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-rose-500/50 p-6 text-center">
+            <AlertTriangle size={32} className="mb-4" />
+            <p className="text-xs font-bold uppercase">{error}</p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={forecastData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="forecastGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={color} stopOpacity={0.2}/>
+                  <stop offset="95%" stopColor={color} stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
+              <XAxis 
+                dataKey="index" 
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: '#475569', fontSize: 10, fontWeight: 600 }}
+              />
+              <YAxis 
+                domain={['auto', 'auto']}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: '#475569', fontSize: 10, fontWeight: 600 }}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              
+              {/* Prediction Interval */}
+              <Area
+                type="monotone"
+                dataKey="upper"
+                stroke="none"
+                fill={color}
+                fillOpacity={0.05}
+                baseValue={(data: any) => data.lower}
+                connectNulls
+              />
+
+              {/* Historical Line */}
+              <Line 
+                type="monotone" 
+                dataKey="value" 
+                stroke={color} 
+                strokeWidth={3}
+                dot={{ r: 3, fill: color, strokeWidth: 0 }}
+                activeDot={{ r: 6, strokeWidth: 0 }}
+                isAnimationActive={true}
+                animationDuration={1500}
+                data={forecastData.filter(d => !d.isForecast)}
+              />
+
+              {/* Forecast Line (Dashed) */}
+              <Line 
+                type="monotone" 
+                dataKey="value" 
+                stroke={color} 
+                strokeWidth={3}
+                strokeDasharray="5 5"
+                dot={{ r: 2, fill: color, strokeWidth: 0, opacity: 0.5 }}
+                isAnimationActive={true}
+                animationDuration={2000}
+                data={forecastData.filter(d => d.isForecast || d.index === historicalData[historicalData.length-1].index)}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      <div className="mt-4 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+           <div className="flex items-center gap-2">
+             <div className="w-3 h-0.5 bg-cyan-400" />
+             <span className="text-[9px] font-bold text-slate-500 uppercase">Historical</span>
+           </div>
+           <div className="flex items-center gap-2">
+             <div className="w-3 h-0.5 border-b border-dashed border-cyan-400" />
+             <span className="text-[9px] font-bold text-slate-500 uppercase">Predicted</span>
+           </div>
+        </div>
+        {!loading && !error && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }}
+            className="text-[10px] font-black text-cyan-500 uppercase animate-pulse"
+          >
+            Statistical Projection Active
+          </motion.div>
+        )}
+      </div>
+    </GlassCard>
+  );
+}
