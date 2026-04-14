@@ -41,10 +41,11 @@ export default function ForecastingPlot({ historicalData, title, unit, color = '
         // Merge historical and forecast
         const lastIdx = historicalData[historicalData.length - 1].index;
         const combined = [
-          ...historicalData.map(d => ({ ...d, isForecast: false, upper: d.value, lower: d.value })),
+          ...historicalData.map(d => ({ ...d, isForecast: false, range: [d.value, d.value], upper: d.value, lower: d.value })),
           ...data.forecast.map((v: number, i: number) => ({
             index: lastIdx + i + 1,
             value: v,
+            range: [data.lower_bound[i], data.upper_bound[i]],
             upper: data.upper_bound[i],
             lower: data.lower_bound[i],
             isForecast: true
@@ -145,11 +146,10 @@ export default function ForecastingPlot({ historicalData, title, unit, color = '
               {/* Prediction Interval */}
               <Area
                 type="monotone"
-                dataKey="upper"
+                dataKey="range"
                 stroke="none"
                 fill={color}
                 fillOpacity={0.05}
-                baseValue={(data: any) => data.lower}
                 connectNulls
               />
 
