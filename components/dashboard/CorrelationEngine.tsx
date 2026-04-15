@@ -179,6 +179,17 @@ export default function CorrelationEngine({ data }: CorrelationEngineProps) {
     return `${strength} ${direction} linear association between ${xLabel} and ${yLabel}; as ${xLabel} changes, ${yLabel} tends to move in the same direction pattern.`;
   }, [regressionResult, appliedXKey, appliedYKey]);
 
+  const pearsonMagnitudePercent = useMemo(() => {
+    if (!regressionResult) return 0;
+    return Math.min(100, Math.round(Math.abs(regressionResult.pearson) * 100));
+  }, [regressionResult]);
+
+  const pearsonTrackColor = regressionResult
+    ? regressionResult.pearson >= 0
+      ? '#22d3ee'
+      : '#fb7185'
+    : '#64748b';
+
   return (
     <div className="space-y-8">
       {/* Selection Control Panel */}
@@ -244,30 +255,27 @@ export default function CorrelationEngine({ data }: CorrelationEngineProps) {
       <div className="grid grid-cols-1 gap-8">
         {regressionResult ? (
           <>
-            {regressionResult.source === 'raw-data' ? (
-              <RegressionPlot 
-                scatter={regressionResult.scatter}
-                slope={regressionResult.slope}
-                intercept={regressionResult.intercept}
-                rSquared={regressionResult.rSquared}
-                xLabel={formatLabel(appliedXKey)}
-                yLabel={formatLabel(appliedYKey)}
-                color="#a855f7"
-              />
-            ) : (
-              <div className="h-56 flex items-center justify-center border border-dashed border-white/10 rounded-2xl p-6 text-center">
-                <div>
-                  <Settings2 size={28} className="text-slate-700 mx-auto mb-3" />
-                  <p className="text-sm font-bold text-slate-300">Matrix-based correlation available</p>
-                  <p className="text-xs text-slate-500 mt-2">
-                    Scatter/regression visualization requires row-level data. Run a fresh analysis upload for full plotting.
-                  </p>
-                </div>
-              </div>
-            )}
-
             <GlassCard className="p-5">
               <h4 className="text-sm font-bold text-slate-100 mb-4">Correlation Summary</h4>
+
+              <div className="mb-4 p-3 rounded-xl border border-white/5 bg-slate-900/50">
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Correlation Strength</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: pearsonTrackColor }}>
+                    {pearsonMagnitudePercent}%
+                  </p>
+                </div>
+                <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${pearsonMagnitudePercent}%`, background: pearsonTrackColor }}
+                  />
+                </div>
+                <p className="text-[10px] text-slate-500 mt-2 uppercase tracking-widest">
+                  Data Source: {regressionResult.source === 'raw-data' ? 'Row-level records' : 'Correlation matrix snapshot'}
+                </p>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
                 <div className="p-3 rounded-xl bg-slate-900/50 border border-white/5">
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Pearson (Linear)</p>
@@ -296,6 +304,31 @@ export default function CorrelationEngine({ data }: CorrelationEngineProps) {
                 </p>
               </div>
             </GlassCard>
+
+            {regressionResult.source === 'raw-data' ? (
+              <RegressionPlot 
+                scatter={regressionResult.scatter}
+                slope={regressionResult.slope}
+                intercept={regressionResult.intercept}
+                rSquared={regressionResult.rSquared}
+                xLabel={formatLabel(appliedXKey)}
+                yLabel={formatLabel(appliedYKey)}
+                color="#a855f7"
+              />
+            ) : (
+              <GlassCard className="p-5">
+                <div className="flex items-start gap-3">
+                  <Settings2 size={20} className="text-slate-600 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-bold text-slate-200">Scatter chart unavailable for this saved session</p>
+                    <p className="text-xs text-slate-500 mt-2">
+                      Correlation values are accurate from the matrix, but point-by-point regression plotting needs row-level data.
+                      Uploading a new file will enable full scatter and regression lines.
+                    </p>
+                  </div>
+                </div>
+              </GlassCard>
+            )}
           </>
         ) : (
           <div className="h-[300px] flex items-center justify-center border border-dashed border-white/10 rounded-2xl">
