@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts';
 import { BarChart3 } from 'lucide-react';
 import GlassCard from '../ui/GlassCard';
@@ -42,6 +43,23 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export default function DistributionCurve({ data, mean, stdDev, title, color = '#22d3ee', delay = 0 }: DistributionCurveProps) {
   const curveData = data?.length > 0 ? data : computeNormal(mean, stdDev);
   const gradId = `probGrad-${title.replace(/\s+/g, '-')}`;
+  const chartWrapperRef = useRef<HTMLDivElement | null>(null);
+  const [chartReady, setChartReady] = useState(false);
+
+  useEffect(() => {
+    const node = chartWrapperRef.current;
+    if (!node) return;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      setChartReady(width > 0 && height > 0);
+    });
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <GlassCard delay={delay} className="h-full">
@@ -55,41 +73,47 @@ export default function DistributionCurve({ data, mean, stdDev, title, color = '
         </div>
       </div>
 
-      <div className="h-[200px] w-full mt-4">
-        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-          <AreaChart data={curveData} margin={{ top: 10, right: 10, left: -40, bottom: 0 }}>
-            <defs>
-              <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={color} stopOpacity={0.3}/>
-                <stop offset="95%" stopColor={color} stopOpacity={0}/>
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-            <XAxis 
-              dataKey="x" 
-              axisLine={false} 
-              tickLine={false} 
-              tick={{ fill: '#475569', fontSize: 10 }}
-              dy={10} 
-            />
-            <YAxis hide />
-            <Tooltip content={<CustomTooltip />} />
-            
-            {/* Markers */}
-            <ReferenceLine x={mean} stroke={color} strokeWidth={2} strokeDasharray="5 5"
-              label={{ value: 'Mean', position: 'top', fill: color, fontSize: 10, fontWeight: 'bold' }} />
-            
-            <Area 
-              type="monotone" 
-              dataKey="y" 
-              stroke={color} 
-              strokeWidth={3} 
-              fillOpacity={1} 
-              fill={`url(#${gradId})`}
-              animationDuration={2000}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+      <div ref={chartWrapperRef} className="h-[200px] min-h-[200px] w-full min-w-0 mt-4">
+        {chartReady ? (
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+            <AreaChart data={curveData} margin={{ top: 10, right: 10, left: -40, bottom: 0 }}>
+              <defs>
+                <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={color} stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor={color} stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
+              <XAxis 
+                dataKey="x" 
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fill: '#475569', fontSize: 10 }}
+                dy={10} 
+              />
+              <YAxis hide />
+              <Tooltip content={<CustomTooltip />} />
+              
+              {/* Markers */}
+              <ReferenceLine x={mean} stroke={color} strokeWidth={2} strokeDasharray="5 5"
+                label={{ value: 'Mean', position: 'top', fill: color, fontSize: 10, fontWeight: 'bold' }} />
+              
+              <Area 
+                type="monotone" 
+                dataKey="y" 
+                stroke={color} 
+                strokeWidth={3} 
+                fillOpacity={1} 
+                fill={`url(#${gradId})`}
+                animationDuration={2000}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="h-full w-full flex items-center justify-center text-[10px] font-bold uppercase tracking-widest text-slate-500">
+            Preparing chart...
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-white/5">

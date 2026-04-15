@@ -165,13 +165,27 @@ export default function ForecastingPlot({ historicalData, title, unit, color = '
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
+      const numericEntry = payload.find((entry: any) => typeof entry?.value === 'number');
+      const displayValue = typeof numericEntry?.value === 'number'
+        ? numericEntry.value
+        : typeof data?.value === 'number'
+          ? data.value
+          : null;
+
+      if (displayValue === null) return null;
+
+      const numericLabel = typeof label === 'number' ? label : Number(label);
+      const stepLabel = Number.isFinite(numericLabel)
+        ? Math.max(1, numericLabel - historicalData.length + 1)
+        : 1;
+
       return (
         <div className="glass-premium p-4 border border-white/10 rounded-xl shadow-2xl">
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">
-            {data.isForecast ? `Forecast Step +${label - historicalData.length + 1}` : `Historical Point #${label}`}
+            {data.isForecast ? `Forecast Step +${stepLabel}` : `Historical Point #${label}`}
           </p>
           <div className="flex items-center gap-2">
-             <span className="text-sm font-black mono text-white">{payload[0].value.toFixed(1)}</span>
+             <span className="text-sm font-black mono text-white">{displayValue.toFixed(1)}</span>
              <span className="text-[10px] font-bold text-slate-500">{unit}</span>
           </div>
           {data.isForecast && (
