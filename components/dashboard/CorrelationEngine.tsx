@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import GlassCard from '../ui/GlassCard';
 import RegressionPlot from '../charts/RegressionPlot';
 import { Network, ArrowLeftRight, Settings2 } from 'lucide-react';
@@ -9,6 +9,12 @@ import { linearRegression } from '@/lib/statistics';
 interface CorrelationEngineProps {
   data: any;
 }
+
+type CorrelationPoint = {
+  x: number;
+  y: number;
+  predicted: number;
+};
 
 export default function CorrelationEngine({ data }: CorrelationEngineProps) {
   const [xKey, setXKey] = useState('heart_rate');
@@ -22,26 +28,45 @@ export default function CorrelationEngine({ data }: CorrelationEngineProps) {
     );
   }, [data]);
 
-  const regressionResult = useMemo(() => {
-    if (!data?.rawData || !xKey || !yKey) return null;
-    
-    // Extract paired data points
-    const xValues = data.rawData.map((row: any) => parseFloat(row[xKey])).filter((v: number) => !isNaN(v));
-    const yValues = data.rawData.map((row: any) => parseFloat(row[yKey])).filter((v: number) => !isNaN(v));
-    
-    // Ensure we have paired data
-    const minLen = Math.min(xValues.length, yValues.length);
-    const pairs = [];
-    for(let i=0; i<minLen; i++) {
-      pairs.push({ x: xValues[i], y: yValues[i], predicted: 0 });
+  useEffect(() => {
+    if (availableKeys.length === 0) return;
+
+    if (!availableKeys.includes(xKey)) {
+      setXKey(availableKeys[0]);
     }
+
+    if (!availableKeys.includes(yKey)) {
+      setYKey(availableKeys[1] || availableKeys[0]);
+    }
+  }, [availableKeys, xKey, yKey]);
+
+  const regressionResult = useMemo(() => {
+    const rows = data?.rawData || data?.records || [];
+    if (!rows?.length || !xKey || !yKey) return null;
+
+    // Keep x/y values paired per row; filtering each axis independently can misalign samples.
+    const pairs: CorrelationPoint[] = rows.reduce((acc: CorrelationPoint[], row: any) => {
+      const xVal = Number(row?.[xKey]);
+      const yVal = Number(row?.[yKey]);
+      if (Number.isFinite(xVal) && Number.isFinite(yVal)) {
+        acc.push({ x: xVal, y: yVal, predicted: 0 });
+      }
+      return acc;
+    }, []);
 
     if (pairs.length < 2) return null;
 
-    const result = linearRegression(xValues.slice(0, minLen), yValues.slice(0, minLen));
-    
+    const xValues = pairs.map((p) => p.x);
+    const yValues = pairs.map((p) => p.y);
+
+    const result = linearRegression(xValues, yValues);
+    const scatter = pairs.map((p) => ({
+      ...p,
+      predicted: parseFloat(result.predict(p.x).toFixed(2)),
+    }));
+
     return {
-      scatter: pairs,
+      scatter,
       ...result
     };
   }, [data, xKey, yKey]);

@@ -134,6 +134,7 @@ export async function POST(req: NextRequest) {
         success: true,
         reportId,
         type: 'csv',
+        rawData: analysis.records.slice(0, 1000),
         totalRecords: analysis.totalCount,
         stats: analysis.stats,
         correlationKeys: analysis.correlationKeys,
