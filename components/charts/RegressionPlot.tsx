@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import {
   ComposedChart, Scatter, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
@@ -39,6 +40,24 @@ const CustomTooltip = ({ active, payload, xLabel, yLabel }: any) => {
 export default function RegressionPlot({
   scatter, slope, intercept, rSquared, xLabel, yLabel, color = '#f59e0b', delay = 0,
 }: RegressionPlotProps) {
+  const chartWrapperRef = useRef<HTMLDivElement | null>(null);
+  const [chartReady, setChartReady] = useState(false);
+
+  useEffect(() => {
+    const node = chartWrapperRef.current;
+    if (!node) return;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      setChartReady(width > 0 && height > 0);
+    });
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   const sign = intercept >= 0 ? '+' : '-';
   const formula = `y = ${slope}x ${sign} ${Math.abs(intercept).toFixed(2)}`;
 
@@ -77,39 +96,45 @@ export default function RegressionPlot({
         </div>
       </div>
 
-      <div className="h-[190px] w-full">
-        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-          <ComposedChart data={plotData} margin={{ top: 5, right: 10, left: -20, bottom: 20 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-            <XAxis
-              dataKey="x"
-              type="number"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: '#475569', fontSize: 9 }}
-              label={{ value: xLabel, position: 'insideBottom', offset: -10, fill: '#475569', fontSize: 9 }}
-              domain={['auto', 'auto']}
-            />
-            <YAxis
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: '#475569', fontSize: 9 }}
-              width={35}
-            />
-            <Tooltip content={<CustomTooltip xLabel={xLabel} yLabel={yLabel} />} />
-            <Scatter dataKey="actual" fill={color} fillOpacity={0.55} r={2.5} name="Actual" animationDuration={1200} />
-            <Line
-              dataKey="predicted"
-              stroke={color}
-              strokeWidth={2.5}
-              dot={false}
-              strokeDasharray="6 3"
-              name="Best Fit"
-              animationDuration={1800}
-              connectNulls
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
+      <div ref={chartWrapperRef} className="h-[190px] min-h-[190px] w-full min-w-0">
+        {chartReady ? (
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+            <ComposedChart data={plotData} margin={{ top: 5, right: 10, left: -20, bottom: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
+              <XAxis
+                dataKey="x"
+                type="number"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: '#475569', fontSize: 9 }}
+                label={{ value: xLabel, position: 'insideBottom', offset: -10, fill: '#475569', fontSize: 9 }}
+                domain={['auto', 'auto']}
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: '#475569', fontSize: 9 }}
+                width={35}
+              />
+              <Tooltip content={<CustomTooltip xLabel={xLabel} yLabel={yLabel} />} />
+              <Scatter dataKey="actual" fill={color} fillOpacity={0.55} r={2.5} name="Actual" animationDuration={1200} />
+              <Line
+                dataKey="predicted"
+                stroke={color}
+                strokeWidth={2.5}
+                dot={false}
+                strokeDasharray="6 3"
+                name="Best Fit"
+                animationDuration={1800}
+                connectNulls
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="h-full w-full flex items-center justify-center text-[10px] font-bold uppercase tracking-widest text-slate-500">
+            Preparing chart...
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-white/5">

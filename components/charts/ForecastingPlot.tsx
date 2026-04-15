@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, AreaChart, Area, ComposedChart, Line,
@@ -25,16 +25,90 @@ type ForecastPoint = {
   isForecast: boolean;
 };
 
+function stdDev(values: number[]): number {
+  if (values.length < 2) return 0;
+  const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
+  const variance = values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / (values.length - 1);
+  return Math.sqrt(variance);
+}
+
+function buildFallbackForecast(historicalData: { index: number; value: number }[], steps: number): ForecastPoint[] {
+  const values = historicalData.map((d) => d.value);
+  const lastIdx = historicalData[historicalData.length - 1]?.index || historicalData.length;
+  const lastValue = values[values.length - 1] || 0;
+  const lookback = Math.min(6, values.length);
+  const recent = values.slice(-lookback);
+  const baseline = recent.reduce((sum, v) => sum + v, 0) / recent.length;
+  const trend = values.length > 1 ? (values[values.length - 1] - values[0]) / (values.length - 1) : 0;
+  const spread = Math.max(1, stdDev(values));
+
+  const forecast = Array.from({ length: steps }, (_, i) => {
+    const stepIndex = i + 1;
+    const predicted = baseline + trend * stepIndex * 0.8;
+    const center = Number(((predicted + lastValue) / 2).toFixed(2));
+    const margin = Number((spread * (0.6 + stepIndex * 0.15)).toFixed(2));
+    return {
+      index: lastIdx + stepIndex,
+      value: center,
+      lower: center - margin,
+      upper: center + margin,
+      band: [center - margin, center + margin] as [number, number],
+      isForecast: true,
+    };
+  });
+
+  return [
+    ...historicalData.map((d) => ({
+      ...d,
+      isForecast: false,
+      upper: d.value,
+      lower: d.value,
+      band: [d.value, d.value] as [number, number],
+    })),
+    ...forecast,
+  ];
+}
+
 export default function ForecastingPlot({ historicalData, title, unit, color = '#22d3ee' }: ForecastingPlotProps) {
   const [forecastData, setForecastData] = useState<ForecastPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const chartWrapperRef = useRef<HTMLDivElement | null>(null);
+  const [chartReady, setChartReady] = useState(false);
+
+  useEffect(() => {
+    const node = chartWrapperRef.current;
+    if (!node) return;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      setChartReady(width > 0 && height > 0);
+    });
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  const latestHistoricalIndex = useMemo(() => {
+    if (historicalData.length === 0) return 0;
+    return historicalData[historicalData.length - 1].index;
+  }, [historicalData]);
 
   useEffect(() => {
     async function getForecast() {
       try {
         setLoading(true);
-        const response = await fetch(`${process.env.NEXT_PUBLIC_ML_SERVICE_URL || 'http://localhost:8000'}/forecast`, {
+        setError(null);
+        const serviceUrl = process.env.NEXT_PUBLIC_ML_SERVICE_URL;
+
+        if (!serviceUrl) {
+          setForecastData(buildFallbackForecast(historicalData, 6));
+          return;
+        }
+
+        const response = await fetch(`${serviceUrl}/forecast`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -43,10 +117,14 @@ export default function ForecastingPlot({ historicalData, title, unit, color = '
           }),
         });
 
-        if (!response.ok) throw new Error('Forecasting service offline');
+        if (!response.ok) {
+          setForecastData(buildFallbackForecast(historicalData, 6));
+          setError('Forecast service unavailable, showing local estimate');
+          return;
+        }
 
         const data = await response.json();
-        
+
         // Merge historical and forecast
         const lastIdx = historicalData[historicalData.length - 1].index;
         const combined = [
@@ -66,10 +144,11 @@ export default function ForecastingPlot({ historicalData, title, unit, color = '
             isForecast: true
           }))
         ];
-        
+
         setForecastData(combined);
       } catch (err: any) {
-        setError(err.message);
+        setForecastData(buildFallbackForecast(historicalData, 6));
+        setError('Forecast service unavailable, showing local estimate');
       } finally {
         setLoading(false);
       }
@@ -123,19 +202,19 @@ export default function ForecastingPlot({ historicalData, title, unit, color = '
         </div>
       </div>
 
-      <div className="h-[280px] w-full relative">
+      <div ref={chartWrapperRef} className="h-[280px] min-h-[280px] w-full min-w-0 relative">
         {loading ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500">
             <Loader2 className="animate-spin mb-4" size={24} />
             <p className="text-[10px] font-bold uppercase tracking-widest">Running regression models...</p>
           </div>
-        ) : error ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-rose-500/50 p-6 text-center">
-            <AlertTriangle size={32} className="mb-4" />
-            <p className="text-xs font-bold uppercase">{error}</p>
+        ) : !chartReady ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500/70 p-6 text-center">
+            <Loader2 className="animate-spin mb-4" size={24} />
+            <p className="text-[10px] font-bold uppercase tracking-widest">Sizing chart container...</p>
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <ComposedChart data={forecastData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="forecastGradient" x1="0" y1="0" x2="0" y2="1">
@@ -191,12 +270,18 @@ export default function ForecastingPlot({ historicalData, title, unit, color = '
                 dot={{ r: 2, fill: color, strokeWidth: 0, opacity: 0.5 }}
                 isAnimationActive={true}
                 animationDuration={2000}
-                data={forecastData.filter(d => d.isForecast || d.index === historicalData[historicalData.length-1].index)}
+                data={forecastData.filter(d => d.isForecast || d.index === latestHistoricalIndex)}
               />
             </ComposedChart>
           </ResponsiveContainer>
         )}
       </div>
+
+      {error && !loading && (
+        <div className="mt-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-amber-400">
+          <AlertTriangle size={12} /> {error}
+        </div>
+      )}
 
       <div className="mt-4 flex items-center justify-between">
         <div className="flex items-center gap-4">

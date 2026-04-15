@@ -66,6 +66,7 @@ export default function CorrelationEngine({ data }: CorrelationEngineProps) {
   const [yKey, setYKey] = useState('systolic_bp');
   const [appliedXKey, setAppliedXKey] = useState('heart_rate');
   const [appliedYKey, setAppliedYKey] = useState('systolic_bp');
+  const [lastCorrelatedAt, setLastCorrelatedAt] = useState<Date | null>(null);
 
   // Dynamically find available numeric keys for comparison
   const availableKeys = useMemo(() => {
@@ -95,7 +96,13 @@ export default function CorrelationEngine({ data }: CorrelationEngineProps) {
   }, [availableKeys, xKey, yKey, appliedXKey, appliedYKey]);
 
   const canCorrelate = availableKeys.length > 1 && xKey !== yKey;
-  const hasPendingSelection = xKey !== appliedXKey || yKey !== appliedYKey;
+
+  const handleCorrelate = () => {
+    if (!canCorrelate) return;
+    setAppliedXKey(xKey);
+    setAppliedYKey(yKey);
+    setLastCorrelatedAt(new Date());
+  };
 
   const regressionResult = useMemo(() => {
     if (!appliedXKey || !appliedYKey || appliedXKey === appliedYKey) return null;
@@ -216,11 +223,8 @@ export default function CorrelationEngine({ data }: CorrelationEngineProps) {
 
             <div className="w-px h-8 bg-white/10" />
             <button
-              onClick={() => {
-                setAppliedXKey(xKey);
-                setAppliedYKey(yKey);
-              }}
-              disabled={!canCorrelate || !hasPendingSelection}
+              onClick={handleCorrelate}
+              disabled={!canCorrelate}
               className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all disabled:opacity-40 disabled:cursor-not-allowed border-cyan-500/30 text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20"
             >
               Correlate
@@ -229,6 +233,10 @@ export default function CorrelationEngine({ data }: CorrelationEngineProps) {
         </div>
         <p className="text-[10px] text-slate-500 mt-3 uppercase tracking-widest">
           Select two different parameters, then click Correlate to refresh the analysis.
+        </p>
+        <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-widest">
+          Active Pair: {formatLabel(appliedXKey)} vs {formatLabel(appliedYKey)}
+          {lastCorrelatedAt ? ` • Updated ${lastCorrelatedAt.toLocaleTimeString()}` : ''}
         </p>
       </GlassCard>
 
